@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http://localhost:11434;">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signia - Dictado Radiológico</title>
+    <style>
+        /* Estilos básicos para demostración (igual que antes) */
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; display: flex; flex-direction: column; height: 100vh; margin: 0; background-color: #f7f7f7; color: #333; }
+        .main-container { display: flex; flex-grow: 1; overflow: hidden; }
+        .sidebar { width: 230px; background-color: #e9e9e9; padding: 15px; overflow-y: auto; border-right: 1px solid #ccc; display: flex; flex-direction: column; }
+        .editor-area { flex-grow: 1; display: flex; flex-direction: column; padding: 15px; background-color: #ffffff; }
+        #editor { flex-grow: 1; width: 100%; border: 1px solid #ccc; padding: 10px; font-size: 15px; resize: none; box-sizing: border-box; margin-bottom: 10px; line-height: 1.6; border-radius: 4px; }
+        #editor:focus { border-color: #007bff; box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25); outline: none;}
+        #editor.dictating { border-color: #e60000; box-shadow: 0 0 5px rgba(230,0,0,0.5); }
+        .button-bar { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        button { padding: 8px 15px; cursor: pointer; border: 1px solid #ccc; background-color: #f0f0f0; border-radius: 4px; font-size: 13px; transition: background-color 0.2s ease; }
+        button:disabled { cursor: not-allowed; opacity: 0.5; }
+        button:hover:not(:disabled) { background-color: #dcdcdc; border-color: #bbb; }
+        .status-bar { margin-top: auto; /* Empuja al fondo del sidebar */ padding-top: 10px; border-top: 1px solid #ccc; font-size: 12px; }
+        .status-indicators { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; font-size: 12px;}
+        .status-indicators > div { display: flex; align-items: center; justify-content: space-between; }
+        .status-label { color: #555; }
+        .status-led { width: 10px; height: 10px; border-radius: 50%; background-color: #d9534f; /* Rojo = inactivo */ display: inline-block; margin-left: 5px; box-shadow: inset 0 0 2px rgba(0,0,0,0.2); transition: background-color 0.3s ease; }
+        .status-led.active { background-color: #5cb85c; /* Verde = activo */ box-shadow: 0 0 5px rgba(92, 184, 92, 0.7); }
+        .notification { display: none; position: fixed; top: 10px; left: 50%; transform: translateX(-50%); padding: 12px 20px; border-radius: 4px; color: #fff; text-align: center; font-size: 14px; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .notification.info { background-color: #31708f; } .notification.success { background-color: #3c763d; }
+        .notification.error { background-color: #a94442; } .notification.warn { background-color: #8a6d3b; }
+        .sidebar h3 { margin-top: 0; margin-bottom: 8px; font-size: 15px; border-bottom: 1px solid #ccc; padding-bottom: 5px; color: #444; }
+        #templates-list { list-style: none; padding: 0; margin: 0 0 15px 0; max-height: 250px; overflow-y: auto; border: 1px solid #ddd; background-color: #fdfdfd; border-radius: 3px;}
+        #templates-list li a { display: block; padding: 6px 8px; text-decoration: none; color: #333; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-bottom: 1px solid #eee; }
+        #templates-list li:last-child a { border-bottom: none; }
+        #templates-list li a:hover { background-color: #e0e0e0; }
+        #dictaphone-info { font-size: 11px; margin-top: 5px; color: #555; min-height: 1.2em;}
+        #status-message { font-weight: bold; color: #444; }
+        #word-count { color: #666; }
+    </style>
+</head>
+<body>
+    <div id="notification" role="alert" aria-live="assertive"></div>
+
+    <div class="main-container">
+        <aside class="sidebar">
+            <h3>Plantillas</h3>
+            <ul id="templates-list"><li>Cargando...</li></ul>
+
+            <h3>Estado</h3>
+            <div class="status-indicators">
+                <div><span class="status-label">Dictado:</span> <span id="dictation-status" class="status-led" role="status" aria-label="Estado del servicio de dictado"></span></div>
+                <div><span class="status-label">Dictáfono:</span> <span id="dictaphone-status" class="status-led" role="status" aria-label="Estado del dictáfono"></span></div>
+                <div><span class="status-label">Asistente IA:</span> <span id="ollama-status" class="status-led" role="status" aria-label="Estado del asistente IA"></span></div>
+            </div>
+            <div id="dictaphone-info" aria-live="polite">No conectado</div>
+            <button id="refresh-dictaphone" title="Buscar y conectar dictáfono">Conectar Dictáfono</button>
+
+            <div style="flex-grow: 1;"></div> <footer class="status-bar">
+                <span id="status-message" aria-live="polite">Listo.</span>
+                <span id="word-count">0 palabras</span>
+            </footer>
+        </aside>
+
+        <main class="editor-area">
+            <div class="button-bar">
+                <button id="start-dictation" title="Iniciar Dictado">▶️ Iniciar Dictado</button>
+                <button id="stop-dictation" title="Detener Dictado" disabled>⏹️ Detener</button>
+                <button id="clear-text" title="Limpiar texto del editor">🗑️ Limpiar</button>
+                <button id="new-report" title="Crear un nuevo informe vacío">📄 Nuevo Informe</button>
+                <button id="save-report" title="Guardar informe actual (simulado)">💾 Guardar</button>
+                <button id="improve-report" title="Mejorar texto actual usando IA (Ollama)" disabled>✨ Mejorar IA</button>
+                </div>
+            <textarea id="editor" placeholder="Comience a dictar o escriba aquí el informe..." aria-label="Editor de informes radiológicos"></textarea>
+        </main>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

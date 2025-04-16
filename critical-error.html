@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';">
+    <title>Error Crítico - Signia</title>
+    <style>
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; padding: 30px; background-color: #f8d7da; color: #721c24; display: flex; justify-content: center; align-items: center; min-height: 100vh; box-sizing: border-box;}
+        .error-container { max-width: 700px; width: 100%; padding: 25px 30px; border: 1px solid #f5c6cb; background-color: #f2dede; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #721c24; margin-top: 0; font-size: 24px; border-bottom: 1px solid #f5c6cb; padding-bottom: 10px; margin-bottom: 15px;}
+        p { line-height: 1.6; font-size: 15px; }
+        pre { background-color: #eee; border: 1px solid #ddd; padding: 15px; white-space: pre-wrap; word-wrap: break-word; font-size: 12px; max-height: 250px; overflow-y: auto; border-radius: 4px; color: #333; font-family: monospace;}
+        .actions { margin-top: 25px; text-align: right; }
+        .actions button { margin-left: 10px; padding: 10px 18px; cursor: pointer; border: 1px solid #ccc; background-color: #e7e7e7; border-radius: 4px; font-size: 14px; color: #333;}
+        .actions button:hover { background-color: #dcdcdc; }
+        .actions button:disabled { cursor: not-allowed; opacity: 0.6; }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>Error Crítico de Aplicación</h1>
+        <p>Signia encontró un problema grave y no pudo iniciarse correctamente.</p>
+        <p><strong>Detalles del Error:</strong></p>
+        <pre id="error-message">Cargando detalles del error...</pre>
+        <p>Puede intentar reiniciar la aplicación. Si el problema persiste, póngase en contacto con el soporte técnico o revise los archivos de log.</p>
+        <div class="actions">
+            <button id="restart-btn">Reiniciar Aplicación</button>
+            <button id="quit-btn">Cerrar Aplicación</button>
+        </div>
+    </div>
+
+    <script>
+        // Script para manejar la página de error
+        const errorElement = document.getElementById('error-message');
+        const restartBtn = document.getElementById('restart-btn');
+        const quitBtn = document.getElementById('quit-btn');
+
+        // Función para mostrar el error (escapando HTML básico)
+        function displayError(encodedMsg) {
+            if (errorElement) {
+                const msg = encodedMsg ? decodeURIComponent(encodedMsg) : 'No se proporcionaron detalles específicos del error.';
+                // Simple escape para prevenir inyección básica de HTML
+                errorElement.textContent = msg;
+            }
+        }
+
+        // Obtener error de URL
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const errorMessage = urlParams.get('error');
+            displayError(errorMessage);
+        } catch (e) {
+             displayError('Error al obtener detalles del error desde la URL.');
+             console.error("Error parsing URL params:", e);
+        }
+
+
+        // Habilitar/deshabilitar botones y añadir listeners si la API existe
+        if (window.api && window.api.restartApp && window.api.quitApp) {
+             restartBtn?.addEventListener('click', () => window.api.restartApp());
+             quitBtn?.addEventListener('click', () => window.api.quitApp());
+             if (restartBtn) restartBtn.disabled = false;
+             if (quitBtn) quitBtn.disabled = false;
+        } else {
+            console.error("API del Preload no encontrada en critical-error.html.");
+             if (restartBtn) restartBtn.disabled = true;
+             if (quitBtn) quitBtn.disabled = true;
+             if (errorElement) errorElement.textContent += "\n\nADVERTENCIA: Funciones de Reinicio/Cierre deshabilitadas (Fallo comunicación interna). Cierre la ventana manualmente.";
+        }
+    </script>
+</body>
+</html>
