@@ -3,8 +3,8 @@ const sqlite3 = require('sqlite3');
 const path = require('path');
 const fs = require('fs-extra');
 const { app } = require('electron');
-const logger = require('../utils/logger');
-const ERROR_TYPES = require('../utils/error-types');
+const logger = require('./logger');
+const ERROR_TYPES = require('./error-types');
 
 // Ubicación de la base de datos
 const DEFAULT_DB_PATH = path.join(app.getPath('userData'), 'signia_data.sqlite'); // Nombre de archivo actualizado
